@@ -1,0 +1,72 @@
+version: "3.9"
+
+services:
+  jev-postgres:
+    image: postgres:15-alpine
+    container_name: jev_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: jevpassword
+      POSTGRES_DB: jev_db
+    ports:
+      - "5446:5432"
+    volumes:
+      - jev_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - jev_network
+
+  jev-langfuse:
+    image: langfuse/langfuse:2
+    container_name: jev_langfuse
+    depends_on:
+      jev-postgres:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://postgres:jevpassword@jev-postgres:5432/jev_db
+      - NEXTAUTH_SECRET=jevnextauthsecret2026
+      - NEXTAUTH_URL=http://localhost:3016
+      - SALT=jevsalt2026
+      - ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000
+      - TELEMETRY_ENABLED=false
+      - LANGFUSE_INIT_USER_EMAIL=admin@jev.ai
+      - LANGFUSE_INIT_USER_PASSWORD=adminpassword123
+      - LANGFUSE_INIT_ORG_ID=jev-org
+      - LANGFUSE_INIT_ORG_NAME=TypeSafe Jev Org
+      - LANGFUSE_INIT_PROJECT_ID=jev-project
+      - LANGFUSE_INIT_PROJECT_NAME=LLM Jev Engine
+      - LANGFUSE_INIT_PROJECT_PUBLIC_KEY=pk-lf-jev
+      - LANGFUSE_INIT_PROJECT_SECRET_KEY=sk-lf-jev
+      - LANGFUSE_DISABLE_SIGNUP=true
+    ports:
+      - "3016:3000"
+    networks:
+      - jev_network
+
+  jev-engine-app:
+    build: .
+    container_name: jev_engine_app
+    ports:
+      - "8016:8016"
+    environment:
+      - JEV_ENV=production
+      - JEV_LOG_LEVEL=INFO
+      - LANGFUSE_ENABLED=true
+      - LANGFUSE_PUBLIC_KEY=pk-lf-jev
+      - LANGFUSE_SECRET_KEY=sk-lf-jev
+      - LANGFUSE_HOST=http://jev-langfuse:3000
+    depends_on:
+      - jev-langfuse
+    networks:
+      - jev_network
+
+networks:
+  jev_network:
+    driver: bridge
+
+volumes:
+  jev_postgres_data:
