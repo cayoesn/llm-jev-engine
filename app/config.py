@@ -67,10 +67,32 @@ class Settings(BaseSettings):
     JEV_OPEN_WEIGHTS_BASE_URL: str = "http://localhost:11434"
     JEV_OPEN_WEIGHTS_MODEL: str = "qwen2.5:0.5b"
     JEV_OPEN_WEIGHTS_TIMEOUT_SECONDS: float = Field(default=2.5, gt=0.0)
+    JEV_SYSTEM2_GATEWAY_BASELINE_LATENCY_MS: float = Field(default=850.0, gt=0.0)
+    JEV_SYSTEM2_JUDGE_BASELINE_LATENCY_MS: float = Field(default=1850.0, gt=0.0)
     LANGFUSE_ENABLED: bool = False
     LANGFUSE_PUBLIC_KEY: str = "pk-lf-jev"
     LANGFUSE_SECRET_KEY: str = "sk-lf-jev"
     LANGFUSE_HOST: str = "http://localhost:3016"
+
+    @property
+    def JEV_CACHE_MAX_SIZE(self) -> int:
+        """Alias returning JEV_SHARED_CACHE_MAX_SIZE."""
+        return self.JEV_SHARED_CACHE_MAX_SIZE
+
+    @property
+    def JEV_CACHE_TTL_SECONDS(self) -> float:
+        """Alias returning JEV_SHARED_CACHE_TTL_SECONDS."""
+        return self.JEV_SHARED_CACHE_TTL_SECONDS
+
+    @property
+    def OLLAMA_BASE_URL(self) -> str:
+        """Alias returning JEV_OPEN_WEIGHTS_BASE_URL."""
+        return self.JEV_OPEN_WEIGHTS_BASE_URL
+
+    @property
+    def OLLAMA_MODEL(self) -> str:
+        """Alias returning JEV_OPEN_WEIGHTS_MODEL."""
+        return self.JEV_OPEN_WEIGHTS_MODEL
 
     @property
     def CONFIDENCE_AUTO_THRESHOLD(self) -> float:

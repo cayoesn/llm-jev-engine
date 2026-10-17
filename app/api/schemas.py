@@ -25,6 +25,9 @@ RagPipelineAction = Literal[
     "rewrite_with_citations",
     "trigger_corrective_rag",
     "block_and_escalate",
+    "RELEASE_RESPONSE",
+    "REGENERATE_SYSTEM2",
+    "BLOCK_AND_ESCALATE",
 ]
 
 
@@ -407,6 +410,21 @@ class SupportTriageResponse(BaseModel):
         """Alias returning automation_gate_action."""
         return self.automation_gate_action
 
+    @property
+    def automation_gate(self) -> GateAction:
+        """Alias returning automation_gate_action."""
+        return self.automation_gate_action
+
+    @property
+    def sla_breach_imminent(self) -> bool:
+        """Alias returning urgent_sla boolean."""
+        return self.urgent_sla
+
+    @property
+    def churn_risk_index(self) -> float:
+        """Alias returning customer_frustration_score."""
+        return self.customer_frustration_score
+
 
 class RagInlineEvalRequest(BaseModel):
     """Workflow 3 request: JevEval Inline Production Anti-LLM-as-a-Judge for RAG pipelines."""
@@ -440,6 +458,30 @@ class RagInlineEvalResponse(BaseModel):
     primitive_breakdown: dict[str, PrimitiveResult]
     gain_metrics: WorkflowGainMetrics
     audit_signature: str = Field(default="")
+    hallucination_severity: str = Field(default="none")
+
+    @property
+    def grounded_in_context(self) -> bool:
+        """Alias returning context_faithful."""
+        return self.context_faithful
+
+    @property
+    def faithfulness_score(self) -> float:
+        """Alias returning answer_quality_score."""
+        return self.answer_quality_score
+
+    @property
+    def release_action(self) -> str:
+        """Return canonical release action string mapped from pipeline_action."""
+        if self.pipeline_action in ("publish_response", "RELEASE_RESPONSE"):
+            return "RELEASE_RESPONSE"
+        if self.pipeline_action in (
+            "rewrite_with_citations",
+            "trigger_corrective_rag",
+            "REGENERATE_SYSTEM2",
+        ):
+            return "REGENERATE_SYSTEM2"
+        return "BLOCK_AND_ESCALATE"
 
 
 class FinOpsBenchmarkRequest(BaseModel):
