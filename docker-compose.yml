@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   jev-postgres:
     image: postgres:15-alpine

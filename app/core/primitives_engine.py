@@ -186,7 +186,7 @@ CONCEPT_SYNONYMS: dict[str, tuple[str, ...]] = {
 
 def _stem_token(token: str) -> str:
     """Produce a lightweight deterministic morphological stem for lexical matching."""
-    if len(token) <= 4:
+    if len(token) < 4:
         return token
     for suffix in ("ation", "ition", "ments", "ment", "ings", "ing", "edly", "ed", "ies", "es", "s"):
         if token.endswith(suffix) and len(token) - len(suffix) >= 3:
@@ -205,6 +205,17 @@ def _extract_tokens_and_stems(text: str) -> tuple[list[str], set[str]]:
             stems.add(tok)
             stems.add(_stem_token(tok))
     return raw_tokens, stems
+
+
+def _compute_rag_root_overlap(retrieved_context: str, candidate_answer: str) -> float:
+    """Compute morphological root-stem recall of candidate_answer against retrieved_context."""
+    ctx_tokens, _ = _extract_tokens_and_stems(retrieved_context)
+    ans_tokens, _ = _extract_tokens_and_stems(candidate_answer)
+    ctx_roots = {_stem_token(t) for t in ctx_tokens if t not in STOPWORDS}
+    ans_roots = {_stem_token(t) for t in ans_tokens if t not in STOPWORDS}
+    if not ans_roots:
+        return 0.0
+    return len(ans_roots & ctx_roots) / len(ans_roots)
 
 
 def _project_spectral_vector(text: str, dim: int = 64) -> np.ndarray:
@@ -440,6 +451,20 @@ class PrimitivesEngine:
         else:
             logits = 0.02 * spectral_sim
 
+        raw_state = context.raw_state
+        if "retrieved_context" in raw_state and "candidate_answer" in raw_state:
+            rag_overlap = _compute_rag_root_overlap(
+                str(raw_state["retrieved_context"]),
+                str(raw_state["candidate_answer"]),
+            )
+            for idx, opt_key in enumerate(option_keys):
+                if opt_key == "publish_response" and rag_overlap >= 0.55:
+                    logits[idx] += 5.5 * rag_overlap
+                elif opt_key == "block_and_escalate" and rag_overlap < 0.35:
+                    logits[idx] += 8.5 * (1.0 - rag_overlap)
+                elif opt_key == "trigger_corrective_rag" and 0.35 <= rag_overlap < 0.55:
+                    logits[idx] += 5.0
+
         temperature = (
             spec.calibration_temperature
             if spec.calibration_temperature is not None
@@ -492,12 +517,11 @@ class PrimitivesEngine:
 
         if "retrieved_context" in raw_state and "candidate_answer" in raw_state:
             if any(w in q_lower for w in ("faithful", "ground", "context", "hallucinat", "support")):
-                _, ctx_stems = _extract_tokens_and_stems(str(raw_state["retrieved_context"]))
-                _, ans_stems = _extract_tokens_and_stems(str(raw_state["candidate_answer"]))
-                if not ans_stems:
-                    return -3.0
-                overlap = len(ans_stems & ctx_stems) / len(ans_stems)
-                return (overlap - 0.38) * 9.5
+                overlap = _compute_rag_root_overlap(
+                    str(raw_state["retrieved_context"]),
+                    str(raw_state["candidate_answer"]),
+                )
+                return (overlap - 0.38) * 10.5
 
         if any(w in q_lower for w in ("safe", "compliant", "compliance", "policy")):
             unsafe_signal = feats.get("concept:unsafe", 0.0)
@@ -609,12 +633,14 @@ class PrimitivesEngine:
 
         if "retrieved_context" in raw_state and "candidate_answer" in raw_state:
             if any(w in q_lower for w in ("quality", "answer", "helpfulness", "completeness")):
-                _, ctx_stems = _extract_tokens_and_stems(str(raw_state["retrieved_context"]))
-                _, ans_stems = _extract_tokens_and_stems(str(raw_state["candidate_answer"]))
-                if not ans_stems:
-                    return v_min
-                overlap = min(1.0, len(ans_stems & ctx_stems) / max(1, len(ans_stems)))
-                return v_min + span * (0.2 + 0.78 * overlap)
+                overlap = min(
+                    1.0,
+                    _compute_rag_root_overlap(
+                        str(raw_state["retrieved_context"]),
+                        str(raw_state["candidate_answer"]),
+                    ),
+                )
+                return v_min + span * (0.15 + 0.85 * overlap)
 
         if any(w in q_lower for w in ("frustrat", "sentiment", "angry", "satisfaction", "tone")):
             high_cues = sum(
