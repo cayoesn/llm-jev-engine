@@ -366,3 +366,8 @@ class RLCDCalibrator:
             logits=request.samples,
             n_bins=request.num_bins,
         )
+
+    def fit(self, request: CalibrationFitRequest) -> CalibrationFitResponse:
+        """Alias for fit_from_request() fitting RLCD parameters from a CalibrationFitRequest."""
+        return self.fit_from_request(request)
+

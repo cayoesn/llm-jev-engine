@@ -564,6 +564,109 @@ class EngineStatsResponse(BaseModel):
     circuit_breaker_state: str = "CLOSED"
 
 
+class SingleChoiceRequest(BaseModel):
+    """Single-primitive convenience request for evaluating a 'choice' decision over shared state."""
+
+    model_config = ConfigDict(frozen=True)
+
+    state: dict[str, Any] = Field(..., min_length=1)
+    name: str = Field(default="choice_primitive", min_length=1, max_length=128)
+    question: str = Field(..., min_length=3, max_length=4096)
+    options: dict[str, str] | list[str]
+    abstention_threshold: float = Field(default=0.45, ge=0.0, le=1.0)
+    calibration_temperature: float | None = Field(default=None, gt=0.0, le=10.0)
+    bypass_cache: bool = False
+    fast_path_enabled: bool = True
+
+    def to_shared_request(self) -> SharedStateDecisionRequest:
+        """Convert into a canonical SharedStateDecisionRequest with a single choice primitive."""
+        spec = PrimitiveSpec(
+            name=self.name,
+            kind="choice",
+            question=self.question,
+            options=self.options,
+            abstention_threshold=self.abstention_threshold,
+            calibration_temperature=self.calibration_temperature,
+        )
+        return SharedStateDecisionRequest(
+            state=self.state,
+            primitives=[spec],
+            bypass_cache=self.bypass_cache,
+            fast_path_enabled=self.fast_path_enabled,
+        )
+
+
+class SingleNoulRequest(BaseModel):
+    """Single-primitive convenience request for evaluating a 'noul' binary proposition."""
+
+    model_config = ConfigDict(frozen=True)
+
+    state: dict[str, Any] = Field(..., min_length=1)
+    name: str = Field(default="noul_primitive", min_length=1, max_length=128)
+    question: str = Field(..., min_length=3, max_length=4096)
+    abstention_threshold: float = Field(default=0.45, ge=0.0, le=1.0)
+    calibration_temperature: float | None = Field(default=None, gt=0.0, le=10.0)
+    bypass_cache: bool = False
+    fast_path_enabled: bool = True
+
+    def to_shared_request(self) -> SharedStateDecisionRequest:
+        """Convert into a canonical SharedStateDecisionRequest with a single noul primitive."""
+        spec = PrimitiveSpec(
+            name=self.name,
+            kind="noul",
+            question=self.question,
+            abstention_threshold=self.abstention_threshold,
+            calibration_temperature=self.calibration_temperature,
+        )
+        return SharedStateDecisionRequest(
+            state=self.state,
+            primitives=[spec],
+            bypass_cache=self.bypass_cache,
+            fast_path_enabled=self.fast_path_enabled,
+        )
+
+
+class SingleScoreRequest(BaseModel):
+    """Single-primitive convenience request for evaluating a 'score' ordinal rubric."""
+
+    model_config = ConfigDict(frozen=True)
+
+    state: dict[str, Any] = Field(..., min_length=1)
+    name: str = Field(default="score_primitive", min_length=1, max_length=128)
+    question: str = Field(..., min_length=3, max_length=4096)
+    levels: dict[int, str]
+    abstention_threshold: float = Field(default=0.45, ge=0.0, le=1.0)
+    calibration_temperature: float | None = Field(default=None, gt=0.0, le=10.0)
+    bypass_cache: bool = False
+    fast_path_enabled: bool = True
+
+    def to_shared_request(self) -> SharedStateDecisionRequest:
+        """Convert into a canonical SharedStateDecisionRequest with a single score primitive."""
+        spec = PrimitiveSpec(
+            name=self.name,
+            kind="score",
+            question=self.question,
+            levels=self.levels,
+            abstention_threshold=self.abstention_threshold,
+            calibration_temperature=self.calibration_temperature,
+        )
+        return SharedStateDecisionRequest(
+            state=self.state,
+            primitives=[spec],
+            bypass_cache=self.bypass_cache,
+            fast_path_enabled=self.fast_path_enabled,
+        )
+
+
+class CacheEvictionResponse(BaseModel):
+    """Response returned when clearing the Shared-State BoundedDecisionCache."""
+
+    model_config = ConfigDict(frozen=True)
+
+    cleared_entries: int = Field(default=0, ge=0)
+    status: str = "cleared"
+
+
 SystemOneRequest = SharedStateDecisionRequest
 SystemOneResponse = SharedStateDecisionResponse
 CalibrationReportResponse = CalibrationFitResponse
@@ -571,3 +674,4 @@ TicketTriageRequest = SupportTriageRequest
 TicketTriageResponse = SupportTriageResponse
 JevEvalRequest = RagInlineEvalRequest
 JevEvalResponse = RagInlineEvalResponse
+
